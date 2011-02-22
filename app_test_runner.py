@@ -11,29 +11,41 @@ from django.core.management import call_command
 
 def main():
     """
-    The entry point for the script. This script is fairly basic. Here is a
-    quick example of how to use it::
+    This main script of the django-app-test-runner package enables
+    standalone testing (and thus development) of a Django app, by
+    bootstrapping a Django environment around the app.  You can
+    thereby work on a Django app outside the scope of any single
+    particular Django site/project.
 
-        app_test_runner.py [path-to-app]
+    You must have the Django package on the PYTHONPATH prior to
+    running this script.  Then after installation of the
+    django-app-test-runner package via setup.py or pip, this script
+    should be in your (virtualenv) bin/ directory and you can use it
+    at the command-line.  For example:
 
-    You must have Django on the PYTHONPATH prior to running this script. This
-    script basically will bootstrap a Django environment for you.
+        app-test-runner <path-to-app>
 
-    By default this script with use SQLite and an in-memory database. If you
-    are using Python 2.5 it will just work out of the box for you.
+    You can - and probably should - specify a settings file for
+    testing the app, e.g. if your app has any dependencies at all
+    beyond the default INSTALLED_APPS below, or varies in any way from
+    the default settings of this script below.  Just run,
 
-    TODO: show more options here.
+        app-test-runner <path-to-app> -s <path-to-app-testing-settings-file>
+
+    By default this script will use SQLite and an in-memory
+    database. If you are using Python >= 2.5 it should 'just work.'
     """
     parser = OptionParser()
-    parser.add_option("--DATABASE_ENGINE", dest="DATABASE_ENGINE", default="sqlite3")
-    parser.add_option("--DATABASE_NAME", dest="DATABASE_NAME", default="")
-    parser.add_option("--DATABASE_USER", dest="DATABASE_USER", default="")
-    parser.add_option("--DATABASE_PASSWORD", dest="DATABASE_PASSWORD", default="")
-    parser.add_option("--SITE_ID", dest="SITE_ID", type="int", default=1)
-
+    parser.add_option(
+        "-s",
+        action="store",
+        default=None,
+        dest="settings_file",
+        help="Use the app settings FILE, instead of defaults.",
+        metavar="FILE")
     options, args = parser.parse_args()
 
-    # check for app in args
+    # The app's location must be present in args:
     try:
         app_path = args[0]
     except IndexError:
@@ -45,12 +57,17 @@ def main():
         parent_dir, app_name = os.path.split(app_path)
         sys.path.insert(0, parent_dir)
 
-    settings.configure(**{
-        "DATABASE_ENGINE": options.DATABASE_ENGINE,
-        "DATABASE_NAME": options.DATABASE_NAME,
-        "DATABASE_USER": options.DATABASE_USER,
-        "DATABASE_PASSWORD": options.DATABASE_PASSWORD,
-        "SITE_ID": options.SITE_ID,
+    # Setup default settings to be used for testing the app. Remember,
+    # for any significant settings different from the below defaults,
+    # you should create a separate settings file for testing, and
+    # specify it with the -s command-line parameter, per the docstring
+    # above.
+    test_settings_dict = {
+        "DATABASES": {
+            "default": {
+                "ENGINE": "sqlite3",
+                "NAME": ""}},
+        "SITE_ID": 1,
         "ROOT_URLCONF": "",
         "TEMPLATE_LOADERS": (
             "django.template.loaders.filesystem.load_template_source",
@@ -60,19 +77,23 @@ def main():
             os.path.join(os.path.dirname(__file__), "templates"),
             ),
         "INSTALLED_APPS": (
-            # HACK: the admin app should *not* be required. Need to spend some
-            # time looking into this. Django #8523 has a patch for this issue,
-            # but was wrongly attached to that ticket. It should have its own
-            # ticket.
-            "django.contrib.admin",
             "django.contrib.auth",
             "django.contrib.contenttypes",
             "django.contrib.sessions",
             "django.contrib.sites",
-            app_name,
-            ),
-        })
-    call_command("test")
+            app_name)}
+
+    # If a settings file was specified, use that instead:
+    if options.settings_file:
+        import imp
+        given_settings = imp.load_source(
+            'foo',  # This arg not needed afterward.
+            os.path.normpath(os.path.expanduser(options.settings_file)))
+        for key in given_settings.__dict__.keys():
+            if key[:2] != '__':
+                test_settings_dict[key] = given_settings.__dict__[key]
+    settings.configure(**test_settings_dict)
+    call_command("test", app_name)  # Only test the app, not dependencies.
 
 if __name__ == "__main__":
     main()
