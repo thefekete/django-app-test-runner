@@ -1,2 +1,3 @@
 *.pyc
 django_app_test_runner.egg-info
+build/
