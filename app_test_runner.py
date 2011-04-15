@@ -65,7 +65,7 @@ def main():
     test_settings_dict = {
         "DATABASES": {
             "default": {
-                "ENGINE": "sqlite3",
+                "ENGINE": "django.db.backends.sqlite3",
                 "NAME": ""}},
         "SITE_ID": 1,
         "ROOT_URLCONF": "",
