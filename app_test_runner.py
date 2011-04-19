@@ -94,6 +94,7 @@ def main():
                 test_settings_dict[key] = given_settings.__dict__[key]
     settings.configure(**test_settings_dict)
     call_command("test", app_name)  # Only test the app, not dependencies.
+    # call_command("shell",) - this works for interactive mode
 
 if __name__ == "__main__":
     main()
